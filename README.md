@@ -8,94 +8,413 @@
 
 **Full-stack ISP management platform for MikroTik PPPoE & Hotspot networks**
 
-[![Release](https://img.shields.io/github/v/release/mhdhaidarah/samm?style=flat-square&color=3b82f6&label=latest%20release)](https://github.com/mhdhaidarah/samm/releases/latest)
-[![Platform](https://img.shields.io/badge/Platform-Ubuntu%20%7C%20Debian-E95420?logo=ubuntu&logoColor=white&style=flat-square)](https://ubuntu.com)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white&style=flat-square)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-latest-009688?logo=fastapi&logoColor=white&style=flat-square)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white&style=flat-square)](https://postgresql.org)
 [![FreeRADIUS](https://img.shields.io/badge/FreeRADIUS-3-CC0000?style=flat-square&logoColor=white)](https://freeradius.org)
-[![A SecuryTik product](https://img.shields.io/badge/a-SecuryTik%20product-22d3ee?style=flat-square)](https://securytik.com)
+[![Platform](https://img.shields.io/badge/Platform-Ubuntu%20%7C%20Debian-E95420?logo=ubuntu&logoColor=white&style=flat-square)](https://ubuntu.com)
 
-[**samm.securytik.com**](https://samm.securytik.com) &nbsp;·&nbsp; [Documentation](https://samm.securytik.com/docs) &nbsp;·&nbsp; [Report a Bug](mailto:samm@securytik.com?subject=SAMM%20Bug%20Report) &nbsp;·&nbsp; [Request a Feature](mailto:samm@securytik.com?subject=SAMM%20Feature%20Request)
+[**securytik.com**](https://securytik.com) &nbsp;·&nbsp; [Report a Bug](mailto:samm@securytik.com?subject=SAMM%20Bug%20Report) &nbsp;·&nbsp; [Request a Feature](mailto:samm@securytik.com?subject=SAMM%20Feature%20Request)
 
 </div>
 
 ---
 
-## What is SAMM?
+## Overview
 
-SAMM (**S**ecuryTik **A**ctive **M**ikroTik **M**anager) is a complete ISP management platform for MikroTik PPPoE & Hotspot networks — subscriber authentication, real-time usage enforcement, billing, hotspot vouchers, and a polished admin + customer portal — built on FreeRADIUS and PostgreSQL.
+SAMM is an ISP management platform built on FreeRADIUS and PostgreSQL. It handles subscriber authentication, real-time usage enforcement, and billing for MikroTik PPPoE and Hotspot deployments — with a polished web portal for administrators and customers.
 
-This is the **public distribution repository**. The shipped product is a compiled bundle published on the [**Releases**](https://github.com/mhdhaidarah/samm/releases) page; the full source is maintained privately by [SecuryTik](https://securytik.com).
+The stack is designed to keep logic close to the database: byte accumulation, limit evaluation, and CoA enqueueing all run inside PostgreSQL functions called directly by FreeRADIUS `unlang` on every Interim-Update — no Python round-trip on the hot path.
+
+```
+MikroTik(s) ──Auth/Acct──► FreeRADIUS ──unlang+rlm_sql──► PostgreSQL
+                ▲                                               │
+                │                                               ▼
+                └──── CoA / Disconnect ◄──── samm-radius · samm-worker · samm-api
+       ▲                                                        │
+       │                                                        ▼
+   WireGuard ◄────── (admin / management plane) ─────────► nginx ◄─► cloudflared ──► Internet
+```
 
 ---
 
-## Install in one command
+## Features
 
-On a fresh **Ubuntu 22.04 / 24.04** or **Debian 12** server:
+<table>
+<tr>
+<td valign="top" width="50%">
 
-```bash
-curl -fsSL https://samm.securytik.com/install.sh | sudo bash
-```
+**🔐 AAA Core**
+- FreeRADIUS 3 + PostgreSQL, PAP/CHAP
+- PPPoE and Hotspot support
+- Hybrid CoA: CoA-Update → auto-fallback to Disconnect-Request
+- Dynamic NAS registration — no FreeRADIUS restart on add/remove
+- Per-user static IP override
 
-That downloads the latest release, verifies it, and runs the full installer — FreeRADIUS, PostgreSQL, nginx, and all five SAMM services — online in minutes.
+**📊 Plans & Limits**
+- Speed (download/upload Mbps) + optional RADIUS Framed-Pool
+- 4 independent limits per plan: `expiration`, `quota`, `uptime`, `daily`
+- Each limit can throttle, switch plan, or disconnect on exhaust
+- Speed windows: scheduled boosts with midnight-crossing support
+- Non-resettable billing counters separate from resettable limit state
 
-<details>
-<summary><b>Or install manually from a release bundle</b></summary>
+**💰 Financial Accounting**
+- Double-entry accounting engine
+- Invoices, expenses, resellers, assets, depreciation
+- Automatic overdue-invoice detection
 
-<br>
+</td>
+<td valign="top" width="50%">
 
-Download the latest `samm-<version>.tar.gz` from the [Releases](https://github.com/mhdhaidarah/samm/releases/latest) page, then:
+**🖥️ Admin Portal**
+- Customer and plan management
+- Live MikroTik device inventory (ping, RouterOS version, interfaces)
+- Firewall backup and scheduled revert
+- WiFi / cAPsMAN management
+- Hotspot voucher card generation & printing
+- Customer support ticket queue
+- Role-based permissions (superadmin / manager / viewer, per page block)
 
-```bash
-tar -xzf samm-<version>.tar.gz
-cd samm-<version>
-sudo bash install.sh
-```
+**🌐 System (host integration)**
+- **WireGuard VPN server** — manage peers, generate keys, download config / QR / MikroTik commands, all from the admin UI
+- **Cloudflare Tunnel** — paste a Zero Trust connector token to publish SAMM online; start / stop / restart / rotate token from the UI, no shell needed
 
-</details>
+**👤 Customer Portal**
+- Self-service: usage, plan info, invoices, support tickets
+- Email / Telegram notifications: renewals, expiry, quota, receipts
 
-The installer is **idempotent** — re-run it with a newer bundle to upgrade, or let SAMM keep itself current automatically (**System → License → auto-update**).
+**🤖 Telegram Self-Service Bot**
+- Verify once with SAMM username + password (password message auto-deleted)
+- Check plan, quota, usage, expiration; view & download invoices as PDF
+- Update profile, change password, manage support tickets — all in chat
 
-When it finishes, open `http://<your-server>/admin/` and sign in with **`admin` / `admin`** — then change the password immediately.
+**🌍 Multilingual & Themeable**
+- 6 built-in languages: English, Arabic (RTL), Turkish, French, Spanish, German
+- Live translation editor at `/admin/translations` — no restart needed
+- 11 visual themes, preference saved per user account
+
+</td>
+</tr>
+</table>
 
 ---
 
-## What's in the box
+## Installation
 
-| | |
+SAMM installs everything it needs — **one script, one server, online in minutes.**
+
+### What the installer sets up automatically
+
+| Component | Details |
 |---|---|
-| **🔐 AAA core** | FreeRADIUS 3 + PostgreSQL · PPPoE & Hotspot · hybrid CoA (update → disconnect fallback) · dynamic NAS — no restart on router add/remove |
-| **📊 Plans & limits** | Speed plans · 4 independent limits (expiration · quota · uptime · daily) · speed windows · throttle / switch-plan / disconnect on exhaust |
-| **👥 Subscribers** | PPPoE & Hotspot users · prepaid hotspot voucher cards with printable PDFs · self-service customer portal |
-| **💰 Billing** | Per-plan pricing · automatic invoices · receipts, payments & expenses ledger |
-| **🖥️ Admin portal** | Live MikroTik inventory · role-based permissions · bulk tools · backup & restore |
-| **🔔 Notifications** | Email + Telegram — renewals, expiry, quota warnings, receipts · interactive Telegram self-service bot |
-| **🌐 System** | Built-in WireGuard VPN server · Cloudflare Tunnel · 6 languages · themeable UI |
+| **FreeRADIUS 3** | Configured with PostgreSQL backend, dynamic NAS clients |
+| **PostgreSQL** | Database + schema + all migrations applied automatically |
+| **Python venv** | All Python dependencies from `requirements.txt` |
+| **nginx** | Reverse-proxy → 8000, SAMM vhost added **additively** (existing sites untouched). Uses port 80 when free; if port 80 is occupied the installer prompts for an alternate port (or set `SAMM_HTTP_PORT`). |
+| **samm-api** | FastAPI admin + customer portal (systemd unit) |
+| **samm-radius** | CoA dispatcher + expiration/quota enforcement (systemd unit) |
+| **samm-worker** | MikroTik API sync + ping monitor (systemd unit) |
+| **samm-notification** | Email / Telegram notification delivery worker (systemd unit) |
+| **samm-telegram** | Interactive Telegram self-service bot (systemd unit) |
+| **WireGuard** | `wireguard` + `wireguard-tools` packages; `/etc/wireguard` group-writable by `samm`; sudoers entry for `wg` / `wg-quick`. Configure peers from System → VPN. |
+| **cloudflared** | Binary always installed (Cloudflare apt repo) + sudoers entry; tunnel **token** optional at install — paste at the prompt, set `CF_TOKEN=…` env var, or configure later via System → Cloudflare Tunnel. |
+
+All credentials (DB password, session signing keys) are **auto-generated** on first install.
+
+### Prerequisites
+
+- Ubuntu 22.04 / 24.04 or Debian 12
+- Root / sudo access
+- SAMM source code at `/opt/samm`
+
+### Step 1 — Get the source
+
+Either clone the repository:
+
+```bash
+git clone https://github.com/your-org/samm.git /opt/samm
+```
+
+…or deploy from a bundle (e.g. `samm.zip` produced on another machine):
+
+```bash
+mkdir -p /opt/samm && unzip samm.zip -d /tmp/samm-bundle
+sudo bash /tmp/samm-bundle/samm/install.sh      # the installer rsyncs itself into /opt/samm
+```
+
+### Step 2 — Run the installer
+
+```bash
+sudo bash /opt/samm/install.sh
+```
+
+The installer is **idempotent** — safe to re-run for upgrades. It shows a live colored progress display (a percentage bar + a per-phase checklist); raw command output is captured in `/var/log/samm-install.log`. Run with `SAMM_VERBOSE=1` to stream that output instead of the bar.
+
+Any prompts happen **up front**, before installation begins:
+
+```
+Cloudflare Zero Trust — paste a connector token to publish SAMM online
+without opening firewall ports.  Get it at:
+  https://one.dash.cloudflare.com  ->  Networks  ->  Tunnels
+Press Enter to skip (configure later from Admin -> System -> Cloudflare Tunnel).
+Token: █
+```
+
+If **port 80 is already in use** by another web server, the installer leaves those sites untouched and asks for an alternate port for SAMM (default `8080`); pass `SAMM_HTTP_PORT=<port>` to choose non-interactively.
+
+Paste your connector token and press Enter. SAMM will be live on your Cloudflare domain immediately — no DNS changes, no open ports, no SSL configuration needed.
+
+To skip and add it later, just press Enter. You then have two options to configure the tunnel without touching the shell again:
+
+1. **From the UI** *(recommended)*: open **Admin → System → Cloudflare Tunnel**, paste your token, click Configure. Start / stop / restart / replace token / uninstall are all one click away. Same page for token rotation later.
+2. From the shell: re-run `CF_TOKEN='your-token' sudo bash /opt/samm/install.sh`.
+
+### Step 3 — First login
+
+When the installer finishes it prints a summary:
+
+```
+============================================================
+  SAMM is installed and running.  (94s)
+  Admin portal  : http://localhost/admin/login
+  Default login : admin / admin   <- CHANGE AFTER FIRST LOGIN
+  HTTP port     : 80
+  DB user / pass: samm / <auto-generated>
+  Config files  : /etc/samm/samm.yaml  /etc/samm/api.env
+  Cloudflare ZT : tunnel configured — check status in the Cloudflare dashboard
+  WireGuard VPN : configure at Admin -> System -> VPN
+  Email OTP     : set SMTP_* in /etc/samm/api.env to enable
+  Install log   : /var/log/samm-install.log
+============================================================
+```
+
+Open the admin portal via your Cloudflare tunnel URL or `http://server-ip/admin/login` (use the `HTTP port` shown above if it is not `80`).  
+Log in with **admin / admin** and change your password immediately.
+
+### Step 4 — Add your first router
+
+Go to **Admin → NAS / Routers → Add**. Fill in the router's IP, RADIUS shared secret, and optionally MikroTik API credentials for live device sync. No FreeRADIUS restart needed — NAS records are resolved dynamically from the database.
+
+### Step 5 — Point your MikroTik at SAMM
+
+On the MikroTik, configure:
+- **RADIUS server**: your server IP, port 1812/1813, the shared secret you entered in step 4
+- **PPPoE / Hotspot**: set RADIUS authentication enabled, Interim-Update interval 60 s
+
+That's it. SAMM handles everything else.
+
+### Step 6 — *(optional)* Stand up a WireGuard VPN for management access
+
+If your MikroTiks live behind NAT or on a separate management network, run a WireGuard server on the SAMM host:
+
+1. **Admin → System → VPN → Server tab**
+2. Click **Generate Keys**, set the listen port (default 51820) and tunnel address (default `10.254.254.1/24`), tick **Enable**, click **Save**
+3. **Clients tab → Add Client** — name the peer, then download its config file, scan the QR with the WireGuard mobile app, or copy the MikroTik RouterOS terminal commands directly to any router
+
+`wg0` is brought up by `wg-quick`; SAMM rewrites `/etc/wireguard/wg0.conf` and reloads the interface in-band for every change.
 
 ---
 
-## Licensing
+## Upgrading
 
-Each SAMM install is licensed **per device**:
+```bash
+git -C /opt/samm pull
+sudo bash /opt/samm/install.sh
+```
 
-| Tier | AAA users | Hotspot cards | NAS / routers |
-|---|---|---|---|
-| **Free** | 100 | 500 | 2 |
-| **Pro** | 2,000 | 5,000 | 5 |
-| **Pro Max** | unlimited | unlimited | unlimited |
-
-Activate and manage licensing from **System → License** in the admin portal. See [samm.securytik.com](https://samm.securytik.com) for pricing.
+The installer re-syncs the source, upgrades the venv, re-applies all SQL migrations (every file is idempotent), reloads FreeRADIUS and nginx configs, and restarts all services. Your config files (`/etc/samm/samm.yaml`, `/etc/samm/api.env`, `/etc/samm/secret.key`) are **never overwritten** on re-runs, and the HTTP port chosen at first install is preserved.
 
 ---
 
-## Documentation & support
+## Configuration
 
-- 📖 **Full guide:** [samm.securytik.com/docs](https://samm.securytik.com/docs) — install & deploy, create plans, add subscribers, limits, and the complete manual
-- 🐛 **Report a bug:** [samm@securytik.com](mailto:samm@securytik.com?subject=SAMM%20Bug%20Report)
-- 💡 **Request a feature:** [samm@securytik.com](mailto:samm@securytik.com?subject=SAMM%20Feature%20Request)
+### `/etc/samm/samm.yaml`
+
+Shared by all Python services. Holds the canonical DB DSN — never duplicate it elsewhere.
+
+```yaml
+db:
+  dsn: "postgresql://samm:<password>@127.0.0.1:5432/samm"
+  min_size: 2
+  max_size: 10
+
+log:
+  level: INFO   # DEBUG / INFO / WARNING / ERROR
+
+secret_key_file: "/etc/samm/secret.key"
+```
+
+### `/etc/samm/api.env`
+
+Loaded by `samm-api` via systemd `EnvironmentFile=`. **Preserve this file across upgrades** — rotating the cookie secrets invalidates all active sessions.
+
+```bash
+DISPLAY_TIMEZONE=UTC          # portal display timezone (e.g. Asia/Beirut)
+ADMIN_SECRET=<random>         # admin session cookie signing key — keep stable
+CUSTOMER_SECRET=<random>      # customer session cookie signing key — keep stable
+
+# Email (OTP password recovery) — leave blank to disable
+SMTP_HOST=
+SMTP_PORT=465
+SMTP_USE_SSL=1
+SMTP_USERNAME=
+SMTP_FROM=SAMM <noreply@example.com>
+SMTP_PASSWORD=
+```
+
+`samm-api` refuses to start if `ADMIN_SECRET` or `CUSTOMER_SECRET` is missing or still set to a placeholder value.
+
+### Live tunables — `samm.settings` table
+
+Updated at runtime with no restart required:
+
+```sql
+UPDATE samm.settings SET value = '15' WHERE key = 'samm_radius_interval_seconds';
+```
+
+| Key | Default | Description |
+|---|---|---|
+| `samm_radius_interval_seconds` | `30` | samm-radius loop cadence |
+| `samm_worker_interval` | `60` | Router ping + API sync cadence |
+| `acct_interim_interval_seconds` | `60` | Acct-Interim-Interval pushed to routers |
+| `daily_reset_time` | `00:00` | Time of daily counter rollover |
+| `server_timezone` | `UTC` | Timezone for windows + daily reset |
+| `coa_default_port` | `3799` | Default CoA UDP port |
+| `coa_retry_max` | `3` | CoA retries before Disconnect-Request fallback |
+| `telegram_bot_enabled` | `true` | Master switch for the Telegram self-service bot |
+
+---
+
+## Service Management
+
+```bash
+# Status overview
+systemctl status freeradius nginx cloudflared samm-api samm-radius samm-worker samm-notification samm-telegram
+
+# Restart all SAMM services
+systemctl restart samm-api samm-radius samm-worker samm-notification samm-telegram
+
+# Live logs
+journalctl -u samm-api          -f
+journalctl -u samm-radius       -f
+journalctl -u samm-worker       -f
+journalctl -u samm-notification -f
+journalctl -u samm-telegram     -f
+
+# Validate FreeRADIUS config after any change under freeradius/
+freeradius -CX
+
+# Run a daemon in the foreground for debugging
+sudo -u samm SAMM_CONFIG=/etc/samm/samm.yaml /opt/samm/venv/bin/python -m samm_radius.main
+sudo -u samm SAMM_CONFIG=/etc/samm/samm.yaml /opt/samm/venv/bin/python -m samm_worker.main
+sudo -u samm SAMM_CONFIG=/etc/samm/samm.yaml /opt/samm/venv/bin/python -m samm_telegram.main
+
+# Port 8000 stuck after a crash
+kill -9 $(lsof -ti:8000) && systemctl restart samm-api
+```
+
+---
+
+## Admin CLI
+
+The CLI inserts rows into `samm.audit_log`. `samm-radius` applies them on its next tick and sends a live CoA refresh if the subscriber is currently online.
+
+```bash
+CLI="sudo -u samm /opt/samm/venv/bin/python -m samm_radius.cli"
+
+$CLI reset-quota       alice      # reset quota counter
+$CLI reset-daily       alice      # reset daily counter
+$CLI reset-uptime      alice      # reset uptime counter
+$CLI reset-expiration  alice      # reset expiration counter
+
+$CLI change-plan alice home-50M   # switch plan (takes effect within one tick)
+
+$CLI encrypt-pw                   # encrypt a MikroTik API password for the DB
+```
+
+---
+
+## Architecture
+
+**FreeRADIUS** (`unlang` + `rlm_sql`) handles every Auth and Acct packet. On each Interim-Update it calls two PostgreSQL functions directly:
+
+- `samm.apply_interim(acctuniqueid, in_bytes, out_bytes, session_secs)` — accumulates usage into `user_limit_state`, `user_usage_totals`, `user_usage_daily`
+- `samm.evaluate_user_limits(user_id)` — first-exhausted-wins evaluation (`expiration → quota → daily → uptime`); inserts a `coa_outbox` row when a limit fires
+
+**samm-radius** drains `samm.coa_outbox` via pyrad (CoA-Update → Disconnect-Request on NACK), runs the expiration sweep, daily reset, speed-window edge detection, and applies admin commands from `samm.audit_log`.
+
+**samm-worker** pings every router and — for routers with API credentials — syncs identity, model, RouterOS version, and interface statistics from the MikroTik API.
+
+**samm-api** is read/write for the web portals but **never sends CoAs directly**. Admin actions are written to `samm.audit_log` and applied by samm-radius within one tick.
+
+**samm-notification** delivers customer notifications (renewal reminder, expiry, quota, payment receipt, plan renewed, broadcast) over Email and Telegram through one throttled `samm.notif_outbox` queue — it only ever *sends*.
+
+**samm-telegram** runs the interactive Telegram self-service bot. A customer verifies once with their SAMM username and password, then checks plan / quota / usage / expiration, updates profile details, changes their password, views invoices and manages support tickets — entirely from Telegram. It is the sole `getUpdates` poller for the bot token; conversation state lives in `samm.tg_bot_session`.
+
+---
+
+## Plans and Limits
+
+Plans define speed (download/upload Mbps), an optional RADIUS Framed-Pool, and up to four independent limit types:
+
+| Limit | Tracks | On exhaust |
+|---|---|---|
+| `expiration` | Days since activation or assignment | `throttle`, `next_plan`, or `disconnect` |
+| `quota` | Total bytes (configurable: both / download / upload) | same |
+| `daily` | Bytes since last daily reset | same |
+| `uptime` | Cumulative session seconds | same |
+
+Each limit resets independently. `samm.user_limit_state` holds resettable counters; `samm.user_usage_totals` and `samm.user_usage_daily` hold permanent billing counters that are never zeroed.
+
+**Speed windows** override the plan's base speed for specific days and clock ranges (highest-speed match wins). Throttled or exhausted users are excluded — the system never lifts speed while a limit is in force.
+
+---
+
+## RADIUS Smoke Test
+
+```bash
+# 1. Authenticate
+radtest alice alicepw 127.0.0.1 0 testing123
+
+# 2. Acct-Start
+echo 'Acct-Status-Type = Start
+Acct-Session-Id = "s-1"
+User-Name = "alice"
+NAS-IP-Address = 127.0.0.1
+Framed-IP-Address = 10.0.0.55' | radclient -x 127.0.0.1:1813 acct testing123
+
+# 3. Interim-Update (triggers limit evaluation inside PostgreSQL)
+echo 'Acct-Status-Type = Interim-Update
+Acct-Session-Id = "s-1"
+User-Name = "alice"
+NAS-IP-Address = 127.0.0.1
+Acct-Input-Octets = 800000
+Acct-Output-Octets = 400000
+Acct-Session-Time = 30' | radclient -x 127.0.0.1:1813 acct testing123
+
+# 4. Inspect DB state
+psql -h 127.0.0.1 -U samm -d samm -c "TABLE samm.user_limit_state;"
+psql -h 127.0.0.1 -U samm -d samm -c "TABLE samm.coa_outbox;"
+psql -h 127.0.0.1 -U samm -d samm -c "TABLE samm.user_usage_daily;"
+```
+
+---
+
+## Notes
+
+- **Cleartext passwords** are required for PAP/CHAP. EAP is explicitly disabled by the installer.
+- **No SSL on the server** — SAMM runs on port 80 behind Cloudflare Zero Trust. TLS is terminated at the Cloudflare edge; the tunnel between cloudflared and the SAMM server is encrypted by the connector.
+- **CoA timing**: time-driven events (expiration, speed windows, daily reset) fire within `samm_radius_interval_seconds` (default 30 s). Lower this in `samm.settings` for tighter enforcement.
+- **Remote PostgreSQL**: the installer assumes a local PG instance. For a remote DB, update `pg_hba.conf` on the DB server and set the DSN in `/etc/samm/samm.yaml` manually after install.
+- **Legacy migration**: only `sql/0006_legacy_extensions.sql`, `sql/0007_invoices.sql`, `sql/legacy_to_samm.sql` and `sql/cleanup_public.sql` are migration-only scripts the installer skips — apply them by hand only when migrating from a pre-SAMM `public.*` schema. Every other numbered `sql/` file is applied automatically on a fresh install.
+- **Regenerating WireGuard server keys is destructive**: every deployed client config still has the OLD server pubkey baked into its `[Peer]` block. After regeneration, you must re-hand-out the updated config (Clients tab → Config / QR) to every device. The UI gates this with a "type REGENERATE to confirm" dialog.
+- **Cloudflare token storage**: the token is never persisted in SAMM's database. `cloudflared service install` embeds it in the unit file's `ExecStart` line under `/etc/systemd/system/cloudflared.service`. Removing the tunnel from the UI deletes that unit file entirely.
+- **Source provenance** — SAMM ships SAMM. Everything else (FreeRADIUS, PostgreSQL, nginx, Python, WireGuard, cloudflared) is fetched at install time from upstream apt repos. Air-gapped installs need to pre-stage those packages.
 
 ---
 
 <div align="center">
 
-Built by [**SecuryTik**](https://securytik.com) &nbsp;·&nbsp; SAMM is a SecuryTik product
+Built by [SecuryTik](https://securytik.com)
 
 </div>

@@ -105,9 +105,23 @@ This is the **public distribution repository**. The shipped product is a compile
 
 ## Installation
 
-SAMM installs everything it needs — **one script, one server, online in minutes.**
+SAMM ships in **two flavors** — pick whichever fits your host:
 
-### One-command install
+|  | 🖥️ **Bare-OS** *(this repo)* | 🐳 **Docker Compose** |
+|---|---|---|
+| Host requirement | Ubuntu 22.04 / 24.04 or Debian 12 | Any host with Docker + Compose |
+| Install | `curl … install.sh \| sudo bash` | `curl … install.sh \| sudo bash` *(or `docker compose up -d` if you can't curl-pipe)* |
+| What runs | systemd units on the host | containers via Compose |
+| Built-in WireGuard + Cloudflare Tunnel admin pages | ✅ | ⏳ *(v1: manage on the host)* |
+| Where to find it | below | **[github.com/mhdhaidarah/samm-docker →](https://github.com/mhdhaidarah/samm-docker)** |
+
+Both paths install the same product; same admin portal, same RADIUS config, same auto-update channel. Pick **Bare-OS** for the full feature set including built-in VPN/tunnel admin. Pick **Docker Compose** if you already manage your stack via containers.
+
+The rest of this README covers the **Bare-OS** install. For Docker, head to **[mhdhaidarah/samm-docker](https://github.com/mhdhaidarah/samm-docker)**.
+
+---
+
+### Bare-OS — one-command install
 
 On a fresh **Ubuntu 22.04 / 24.04** or **Debian 12** server:
 

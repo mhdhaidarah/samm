@@ -100,7 +100,7 @@ MikroTik(s) ──Auth/Acct──► FreeRADIUS ──unlang+rlm_sql──► Po
 **🌍 Multilingual & Themeable**
 - 8 built-in languages: English, Arabic (RTL), Russian, Persian (RTL), Turkish, French, Spanish, German
 - Live translation editor at `/admin/translations` — no restart needed
-- 11 visual themes, preference saved per user account
+- 16 visual themes, preference saved per user account
 
 </td>
 </tr>
@@ -245,6 +245,8 @@ curl -fsSL https://samm.securytik.com/install.sh | sudo bash
 
 Either path re-applies all SQL migrations (every file is idempotent), reloads FreeRADIUS and nginx configs, and restarts all services. Your config files (`/etc/samm/samm.yaml`, `/etc/samm/api.env`, `/etc/samm/secret.key`), the Python runtime, and the WhatsApp bridge's linked session are **never touched** by upgrades, and the HTTP port chosen at first install is preserved.
 
+**On Docker,** upgrades ship as new container images — pull the new tag and recreate the stack via the [`samm-docker`](https://github.com/mhdhaidarah/samm-docker) compose bundle; the in-app **System → Updates** page is intentionally hidden on container installs (it would have nothing to apply).
+
 ---
 
 ## High Availability
@@ -255,7 +257,7 @@ For a no-single-point-of-failure deployment — PostgreSQL streaming replication
 
 ## IPv6 dual-stack
 
-Every subscriber can get IPv6 alongside IPv4. Turn it on in the **router wizard** (an optional, off-by-default step — Auto-Complete never touches it) where you pick the **delegated prefix length** (/48…/64, /56 default) and the IPv6 blocks; the wizard creates the MikroTik `/ipv6` pools and SAMM's RADIUS reply then returns `Framed-IPv6-Pool` (WAN) + `Mikrotik-Delegated-IPv6-Pool` (a routed prefix delegated to each subscriber's LAN via DHCPv6-PD) + optional `DNS-Server-IPv6-Address`. Per-subscriber **static** overrides (`framed_ipv6_prefix` / `delegated_ipv6_prefix`, also on the API) pin a fixed prefix for business customers, and the delegated prefix shows in **Live Sessions**. Works for PPPoE, Hotspot and IPoE.
+Every subscriber can get IPv6 alongside IPv4. Turn it on in the **router wizard** (an optional, off-by-default step — Auto-Complete never touches it) where you supply a single **IPv6 block** and the IPv6 DNS resolvers (defaults to Google IPv6 DNS); the wizard creates one MikroTik `/ipv6` pool, enables IPv6 forwarding (`/ipv6 settings forward=yes`), sets the PPP profile's `remote-ipv6-prefix-pool` so every subscriber gets a **/64 on their link**, and enables router-advertisement DNS — so the client SLAACs a global IPv6 address and learns the resolvers over RA (RDNSS). Per-subscriber **static** overrides (`framed_ipv6_prefix` / `delegated_ipv6_prefix`, also on the API) pin a fixed prefix for business customers — SAMM's RADIUS reply then carries the matching `Framed-IPv6-Prefix` / `Delegated-IPv6-Prefix` — and the prefix shows in **Live Sessions**. Works for PPPoE, Hotspot and IPoE.
 
 ---
 
@@ -395,7 +397,7 @@ $CLI encrypt-pw                   # encrypt a MikroTik API password for the DB
 
 **samm-api** is read/write for the web portals but **never sends CoAs directly**. Admin actions are written to `samm.audit_log` and applied by samm-radius within one tick.
 
-**samm-notification** delivers customer notifications (renewal reminder, expiry, quota, payment receipt, plan renewed, broadcast) over Email and Telegram through one throttled `samm.notif_outbox` queue — it only ever *sends*.
+**samm-notification** delivers customer notifications (renewal reminder, expiry, quota, payment receipt, plan renewed, broadcast) over Email, Telegram, SMS and WhatsApp through one throttled `samm.notif_outbox` queue — it only ever *sends*.
 
 **samm-telegram** runs the interactive Telegram self-service bot. A customer verifies once with their SAMM username and password, then checks plan / quota / usage / expiration, updates profile details, changes their password, views invoices and manages support tickets — entirely from Telegram. It is the sole `getUpdates` poller for the bot token; conversation state lives in `samm.tg_bot_session`.
 

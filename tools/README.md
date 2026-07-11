@@ -13,6 +13,10 @@ container image, and no update will ever place them on your server.
 > Your only way back is a database backup. Take one, and verify it, before you run
 > anything in this directory.
 
+**These tools target bare-OS (Linux) installs.** They expect `/opt/samm`,
+`/etc/samm/` and systemd on the host. On a Docker install they will refuse to run
+(`no SAMM install at /opt/samm`) rather than do anything half-way.
+
 ---
 
 ## Available tools

@@ -249,6 +249,62 @@ Either path re-applies all SQL migrations (every file is idempotent), reloads Fr
 
 ---
 
+## Maintenance tools (external)
+
+Some maintenance jobs are destructive enough that they do not belong in the admin
+panel, where a stray click could destroy a live business. SAMM keeps them as
+standalone, **root-only** scripts you download and run deliberately from the
+shell — never as a button. They are not installed by SAMM and no update will ever
+place them on your server.
+
+They live in **[`tools/`](tools/)** in this repository — see the
+**[tools README](tools/README.md)** for the full list and safety notes.
+
+### 🔴 `samm-wipe-financials.sh` — reset the books
+
+Clears **every financial transaction** so an ISP can start its accounting from
+zero, while leaving **all subscriber and AAA data completely intact**. Useful when
+taking over an install, or after a trial period, when the books are full of data
+the operator wants gone but the customer base must stay exactly as it is.
+
+> 🔴 **DANGER — irreversible data loss.** This permanently destroys all invoices,
+> payments, receipts, wallet balances and ledger history. **There is no undo** —
+> the only way back is a database backup. Never run it on a production install you
+> have not backed up *and verified* first.
+
+**Removes:** invoices + line items, the double-entry ledger (payments, receipts,
+adjustments, wallet top-ups/withdrawals), online-payment transactions, expenses,
+fixed assets and the accounting activity log. Invoice numbering resets, so the
+next invoice starts at #1.
+
+**Keeps:** every subscriber, plan, speed window, limit, usage counter, plan
+history, hotspot card, router, session and RADIUS accounting record — plus your
+accounting configuration (chart of accounts, cash accounts, tax groups, payment
+gateways). Cash/wallet/receivable balances are derived from the ledger, so they
+simply read zero afterwards.
+
+Download it, read it, then run it — **always dry-run first**:
+
+```bash
+curl -fsSL -o samm-wipe-financials.sh \
+  https://raw.githubusercontent.com/mhdhaidarah/samm/main/tools/samm-wipe-financials.sh
+
+sudo bash samm-wipe-financials.sh --dry-run   # show what would be deleted, change nothing
+sudo bash samm-wipe-financials.sh             # do it
+```
+
+> **Do not pipe it into a shell** (`curl … | sudo bash`). For a script that
+> destroys data you want to read it first, and a truncated download must not be
+> able to execute half a wipe.
+
+It is root-only, prints exactly what it will delete, requires you to type `YES`
+(you hold a verified backup) and then `WIPE`, offers to take its own `pg_dump`
+first (aborting if that fails), runs as a single all-or-nothing transaction, and
+**leaves RADIUS running so your subscribers stay online** while the books are
+cleared.
+
+---
+
 ## High Availability
 
 For a no-single-point-of-failure deployment — PostgreSQL streaming replication (primary + hot standby), a standby AAA node, and a tested promote/repoint failover procedure — see **[the HA runbook](https://samm.securytik.com/docs#doc-ha)** (also ships as `docs/HA.md` in every install).

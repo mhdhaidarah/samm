@@ -114,8 +114,8 @@ bold "Resetting password for superadmin: $TARGET_USER"
 echo
 
 # ── read the new password (hidden, twice) ──────────────────────────────────
-read -r -s -p "New password (min 8 chars): " P1; echo
-[ "${#P1}" -ge 8 ] || die "password too short (min 8 characters)"
+read -r -s -p "New password (min 4 chars): " P1; echo
+[ "${#P1}" -ge 4 ] || die "password too short (min 4 characters)"
 read -r -s -p "Repeat new password:        " P2; echo
 [ "$P1" = "$P2" ] || die "passwords do not match"
 

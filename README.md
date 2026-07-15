@@ -382,6 +382,31 @@ $CLI change-plan alice home-50M   # switch plan (takes effect within one tick)
 $CLI encrypt-pw                   # encrypt a MikroTik API password for the DB
 ```
 
+## Maintenance tools
+
+Standalone recovery / maintenance scripts live in [`tools/`](tools/). They are **not** part of the running product — **download, read, then run** as root on the SAMM server. Never pipe them straight into a shell.
+
+**Reset a locked-out admin password** — set a new password for a superadmin straight in the database (also re-enables the account if it was disabled):
+
+```bash
+curl -fsSL -o samm-reset-admin-password.sh \
+  https://raw.githubusercontent.com/mhdhaidarah/samm/main/tools/samm-reset-admin-password.sh
+
+sudo bash samm-reset-admin-password.sh --list        # list the superadmin accounts
+sudo bash samm-reset-admin-password.sh               # reset (prompts for the new password, twice)
+sudo bash samm-reset-admin-password.sh --user alice  # pick a specific superadmin
+```
+
+**Wipe financial data** — reset the books to zero (invoices, ledger, payments, expenses, assets) while leaving every subscriber / AAA record untouched:
+
+```bash
+curl -fsSL -o samm-wipe-financials.sh \
+  https://raw.githubusercontent.com/mhdhaidarah/samm/main/tools/samm-wipe-financials.sh
+
+sudo bash samm-wipe-financials.sh --dry-run          # show what would be deleted, change nothing
+sudo bash samm-wipe-financials.sh                    # do it
+```
+
 ---
 
 ## Architecture

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/admin/static/s-box-logo.svg" width="96" alt="SAMM logo" />
+<img src="s-box-logo.svg" width="96" alt="SAMM logo" />
 
 # SAMM
 
@@ -14,7 +14,7 @@
 [![FreeRADIUS](https://img.shields.io/badge/FreeRADIUS-3-CC0000?style=flat-square&logoColor=white)](https://freeradius.org)
 [![Platform](https://img.shields.io/badge/Platform-Ubuntu%20%7C%20Debian-E95420?logo=ubuntu&logoColor=white&style=flat-square)](https://ubuntu.com)
 
-[**securytik.com**](https://securytik.com) &nbsp;·&nbsp; [Report a Bug](mailto:samm@securytik.com?subject=SAMM%20Bug%20Report) &nbsp;·&nbsp; [Request a Feature](mailto:samm@securytik.com?subject=SAMM%20Feature%20Request)
+[**securytik.com**](https://securytik.com) &nbsp;·&nbsp; [Report a Bug](mailto:samm@securytik.com?subject=SAMM%20Bug%20Report) &nbsp;·&nbsp; [Request a Feature](mailto:samm@securytik.com?subject=SAMM%20Feature%20Request) &nbsp;·&nbsp; [SAMM-Docker](https://github.com/mhdhaidarah/samm-docker)
 
 </div>
 

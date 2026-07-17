@@ -72,7 +72,7 @@ else
     PSQL=(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -qtA)
     if "${PSQL[@]}" -c 'SELECT 1' >/dev/null 2>&1; then
         ok "connect to $DB_NAME @ $DB_HOST:$DB_PORT"
-        subs="$("${PSQL[@]}" -c 'SELECT count(*) FROM samm.subscriber' 2>/dev/null)" \
+        subs="$("${PSQL[@]}" -c 'SELECT count(*) FROM samm."user"' 2>/dev/null)" \
             && ok "subscribers: $subs" || warn "could not count subscribers"
         nas="$("${PSQL[@]}" -c 'SELECT count(*) FROM samm.router' 2>/dev/null)" \
             && ok "routers: $nas" || warn "could not count routers"

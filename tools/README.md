@@ -9,13 +9,16 @@ to find them, download them, read them, and run them deliberately from a shell.
 They are not installed by SAMM, they are not shipped in the tarball or the
 container image, and no update will ever place them on your server.
 
-> ⚠️ **Every script here is destructive and irreversible.**
+> ⚠️ **Scripts marked 🔴 are destructive and irreversible.**
 > Your only way back is a database backup. Take one, and verify it, before you run
-> anything in this directory.
+> anything destructive in this directory.
 
 **These tools target bare-OS (Linux) installs.** They expect `/opt/samm`,
 `/etc/samm/` and systemd on the host. On a Docker install they will refuse to run
 (`no SAMM install at /opt/samm`) rather than do anything half-way.
+
+On a **SAMM Server ISO** appliance, the `samm-tools` command lists and runs the
+latest version of every tool in this directory.
 
 ---
 
@@ -23,7 +26,61 @@ container image, and no update will ever place them on your server.
 
 | Script | What it does | Risk |
 |---|---|---|
+| [`samm-health-check.sh`](samm-health-check.sh) | Full install check-up: services, database, RADIUS ports, portal, disk/RAM, recent errors. | 🟢 Read-only |
+| [`samm-backup-db.sh`](samm-backup-db.sh) | Verified online `pg_dump` of the SAMM database — no downtime. | 🟢 Safe |
+| [`samm-restore-db.sh`](samm-restore-db.sh) | Replaces the whole database with a backup taken by `samm-backup-db.sh`. | 🔴 **Replaces all current data** |
+| [`samm-reset-admin-password.sh`](samm-reset-admin-password.sh) | Sets a new password for a superadmin panel account straight in the DB (lock-out recovery); re-enables the account if disabled. | 🟡 Touches one account row |
 | [`samm-wipe-financials.sh`](samm-wipe-financials.sh) | Resets the books to zero — deletes all invoices, payments, receipts, wallet balances and ledger history. **Keeps every subscriber / AAA record.** | 🔴 **Irreversible data loss** |
+
+---
+
+## 🟢 `samm-health-check.sh` — install check-up
+
+Read-only. Verifies the services (SAMM daemons, FreeRADIUS, PostgreSQL, nginx),
+database connectivity and sizes, the RADIUS 1812/1813 listeners, the admin
+portal, disk and memory headroom, and counts recent service errors. Exit code 0
+when healthy — cron-friendly.
+
+```bash
+sudo bash samm-health-check.sh
+```
+
+## 🟢 `samm-backup-db.sh` — database backup
+
+Takes an **online** `pg_dump` (custom format, compressed) of the SAMM database —
+services keep running, subscribers stay up. The dump is verified with
+`pg_restore --list` before it is called a backup. Default location
+`/root/samm-backups/`, override with `--output FILE`.
+
+```bash
+sudo bash samm-backup-db.sh
+```
+
+## 🔴 `samm-restore-db.sh` — database restore
+
+Replaces the **entire** SAMM database with a dump made by `samm-backup-db.sh`.
+Everything written after that backup is lost. Safety behaviour: `--dry-run`,
+two typed confirmations (`RESTORE` + the database name), an automatic verified
+pre-restore backup (skip with `--no-safety-backup`), single-transaction restore
+(an error rolls back to the previous data), and services are restarted no
+matter what. SAMM services and FreeRADIUS stop during the restore — established
+PPPoE sessions survive on the routers, new logins fail until it finishes.
+
+```bash
+sudo bash samm-restore-db.sh --dry-run /root/samm-backups/<file>.dump
+sudo bash samm-restore-db.sh /root/samm-backups/<file>.dump
+```
+
+## 🟡 `samm-reset-admin-password.sh` — panel lock-out recovery
+
+Sets a new password (bcrypt, exactly like the app) for a superadmin account
+directly in `samm.admin_user`, and re-enables it if disabled. Nothing else is
+read or changed. `--list` shows the superadmin accounts.
+
+```bash
+sudo bash samm-reset-admin-password.sh            # prompts for the new password
+sudo bash samm-reset-admin-password.sh --list
+```
 
 ---
 
